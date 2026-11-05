@@ -1,0 +1,880 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Madison Metro | Service Map</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+
+    <style>
+        :root {
+            color-scheme: light;
+            --ink: #19322e;
+            --muted: #6a7974;
+            --paper: #f3f4ef;
+            --panel: #fffefa;
+            --line: #dce2dc;
+            --accent: #d34e31;
+            --green: #266e58;
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            margin: 0;
+        }
+
+        body {
+            display: grid;
+            grid-template-columns: 330px minmax(0, 1fr);
+            overflow: hidden;
+            background: var(--paper);
+            color: var(--ink);
+            font-family: "DM Sans", "Segoe UI", sans-serif;
+            font-size: 14px;
+        }
+
+        button,
+        input {
+            font: inherit;
+        }
+
+        .sidebar {
+            z-index: 700;
+            display: flex;
+            min-height: 0;
+            flex-direction: column;
+            border-right: 1px solid var(--line);
+            background: var(--panel);
+        }
+
+        .masthead {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            padding: 21px 22px 18px;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .brand-mark {
+            display: grid;
+            width: 42px;
+            height: 42px;
+            flex: 0 0 auto;
+            place-items: center;
+            border-radius: 12px 12px 4px 12px;
+            background: var(--green);
+            color: #fff;
+            font-family: "Space Grotesk", sans-serif;
+            font-size: 13px;
+            font-weight: 700;
+        }
+
+        .eyebrow {
+            margin: 0 0 3px;
+            color: var(--accent);
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 1.2px;
+            text-transform: uppercase;
+        }
+
+        h1,
+        h2,
+        p {
+            margin: 0;
+        }
+
+        h1 {
+            font-family: "Space Grotesk", "DM Sans", sans-serif;
+            font-size: 19px;
+            font-weight: 600;
+            line-height: 1.15;
+        }
+
+        .service-controls {
+            display: grid;
+            gap: 8px;
+            padding: 17px 20px 16px;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .section-label,
+        .date-label {
+            color: var(--muted);
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: .9px;
+            text-transform: uppercase;
+        }
+
+        #service-date {
+            width: 100%;
+            min-height: 40px;
+            padding: 0 11px;
+            border: 1px solid var(--line);
+            border-radius: 5px;
+            background: #fff;
+            color: var(--ink);
+        }
+
+        .feed-period {
+            color: var(--muted);
+            font-size: 11px;
+            line-height: 1.4;
+        }
+
+        .route-heading {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 17px 20px 10px;
+        }
+
+        .route-actions {
+            display: flex;
+            gap: 5px;
+        }
+
+        .route-actions button {
+            min-height: 28px;
+            padding: 0 9px;
+            border: 1px solid var(--line);
+            border-radius: 4px;
+            background: transparent;
+            color: var(--muted);
+            cursor: pointer;
+            font-size: 11px;
+            font-weight: 600;
+        }
+
+        .route-actions button:hover,
+        .route-actions button:focus-visible {
+            border-color: var(--green);
+            color: var(--green);
+        }
+
+        #route-search {
+            min-height: 36px;
+            margin: 0 20px 8px;
+            padding: 0 10px;
+            border: 1px solid var(--line);
+            border-radius: 4px;
+            background: #fff;
+            color: var(--ink);
+        }
+
+        #route-list {
+            min-height: 0;
+            flex: 1;
+            overflow: auto;
+            padding: 0 10px 12px;
+            scrollbar-color: #c8d0ca transparent;
+            scrollbar-width: thin;
+        }
+
+        .route-row {
+            display: grid;
+            min-height: 37px;
+            grid-template-columns: 17px 10px 32px minmax(0, 1fr);
+            align-items: center;
+            gap: 8px;
+            padding: 4px 9px;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+
+        .route-row:hover {
+            background: #f2f5f0;
+        }
+
+        .route-row input {
+            width: 15px;
+            height: 15px;
+            margin: 0;
+            accent-color: var(--green);
+            cursor: pointer;
+        }
+
+        .route-swatch {
+            width: 9px;
+            height: 22px;
+            border-radius: 3px;
+        }
+
+        .route-number {
+            color: var(--ink);
+            font-family: "Space Grotesk", sans-serif;
+            font-size: 12px;
+            font-weight: 700;
+        }
+
+        .route-name {
+            overflow: hidden;
+            color: #45554f;
+            font-size: 12px;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .sidebar-footer {
+            padding: 12px 19px 14px;
+            border-top: 1px solid var(--line);
+            color: var(--muted);
+            font-size: 10px;
+            line-height: 1.45;
+        }
+
+        .sidebar-footer a {
+            color: var(--green);
+            text-decoration-thickness: 1px;
+            text-underline-offset: 2px;
+        }
+
+        main {
+            position: relative;
+            min-width: 0;
+            min-height: 0;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+            background: #e6e9df;
+        }
+
+        .map-status {
+            position: absolute;
+            z-index: 500;
+            top: 16px;
+            right: 16px;
+            display: flex;
+            min-height: 36px;
+            align-items: center;
+            gap: 8px;
+            padding: 0 12px;
+            border: 1px solid rgba(25, 50, 46, .1);
+            border-radius: 5px;
+            background: rgba(255, 254, 250, .96);
+            box-shadow: 0 2px 9px rgba(25, 50, 46, .12);
+            color: #45554f;
+            font-size: 11px;
+        }
+
+        .map-status[hidden] {
+            display: none;
+        }
+
+        .status-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--accent);
+        }
+
+        #load-state {
+            position: absolute;
+            z-index: 800;
+            inset: 0;
+            display: grid;
+            place-items: center;
+            background: rgba(243, 244, 239, .84);
+            color: var(--ink);
+            font-size: 14px;
+        }
+
+        #load-state[hidden] {
+            display: none;
+        }
+
+        .leaflet-container {
+            font-family: "DM Sans", "Segoe UI", sans-serif;
+        }
+
+        .leaflet-popup-content-wrapper {
+            overflow: hidden;
+            border: 1px solid rgba(25, 50, 46, .12);
+            border-radius: 7px;
+            background: var(--panel);
+            box-shadow: 0 6px 24px rgba(25, 50, 46, .2);
+        }
+
+        .leaflet-popup-content {
+            width: min(390px, 76vw) !important;
+            margin: 0;
+        }
+
+        .leaflet-popup-tip {
+            background: var(--panel);
+        }
+
+        .stop-popup-head {
+            padding: 13px 15px 11px;
+            border-bottom: 1px solid var(--line);
+        }
+
+        .stop-popup-code {
+            margin-bottom: 4px;
+            color: var(--accent);
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: .7px;
+            text-transform: uppercase;
+        }
+
+        .stop-popup-title {
+            color: var(--ink);
+            font-family: "Space Grotesk", sans-serif;
+            font-size: 16px;
+            font-weight: 600;
+            line-height: 1.25;
+        }
+
+        .stop-popup-date {
+            margin-top: 4px;
+            color: var(--muted);
+            font-size: 11px;
+        }
+
+        .stop-popup-live {
+            margin-top: 7px;
+            font-size: 11px;
+        }
+
+        .stop-popup-live a {
+            color: #b53225;
+            font-weight: 700;
+            text-decoration-thickness: 1px;
+            text-underline-offset: 2px;
+        }
+
+        .stop-schedule {
+            max-height: min(46vh, 390px);
+            overflow: auto;
+            padding: 3px 15px 13px;
+        }
+
+        .schedule-empty {
+            padding: 15px 0 5px;
+            color: var(--muted);
+            font-size: 12px;
+        }
+
+        .time-group {
+            padding: 9px 0 8px;
+            border-bottom: 1px solid #e8ece7;
+        }
+
+        .time-group:last-child {
+            border-bottom: 0;
+        }
+
+        .time-group-heading {
+            display: flex;
+            align-items: center;
+            gap: 7px;
+            margin-bottom: 5px;
+            color: #334940;
+            font-size: 11px;
+            font-weight: 700;
+        }
+
+        .time-group-heading::before {
+            width: 8px;
+            height: 8px;
+            flex: 0 0 auto;
+            border-radius: 2px;
+            background: var(--route-color);
+            content: "";
+        }
+
+        .time-headsign {
+            overflow: hidden;
+            color: var(--muted);
+            font-size: 10px;
+            font-weight: 500;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .time-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+        }
+
+        .departure-time {
+            padding: 3px 5px;
+            border-radius: 3px;
+            background: #f0f3ed;
+            color: var(--ink);
+            font-size: 10px;
+            font-variant-numeric: tabular-nums;
+            white-space: nowrap;
+        }
+
+        @media (max-width: 720px) {
+            body {
+                grid-template-columns: minmax(0, 1fr);
+                grid-template-rows: minmax(0, 1fr) min(42vh, 350px);
+            }
+
+            main {
+                grid-row: 1;
+            }
+
+            .sidebar {
+                grid-row: 2;
+                border-top: 1px solid var(--line);
+                border-right: 0;
+            }
+
+            .masthead {
+                padding: 10px 15px;
+            }
+
+            .brand-mark {
+                width: 34px;
+                height: 34px;
+            }
+
+            h1 {
+                font-size: 16px;
+            }
+
+            .service-controls {
+                grid-template-columns: minmax(150px, .75fr) minmax(0, 1fr);
+                align-items: center;
+                gap: 6px 12px;
+                padding: 9px 15px;
+            }
+
+            .service-controls .date-label {
+                align-self: end;
+            }
+
+            #service-date {
+                grid-column: 1;
+                min-height: 34px;
+            }
+
+            .feed-period {
+                grid-column: 2;
+                grid-row: 1 / span 2;
+            }
+
+            .route-heading {
+                padding: 9px 15px 6px;
+            }
+
+            #route-search {
+                min-height: 32px;
+                margin: 0 15px 6px;
+            }
+
+            #route-list {
+                display: grid;
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                align-content: start;
+                padding: 0 10px 8px;
+            }
+
+            .route-row {
+                min-height: 32px;
+                grid-template-columns: 15px 8px 27px minmax(0, 1fr);
+                gap: 5px;
+                padding: 3px 5px;
+            }
+
+            .route-swatch {
+                width: 7px;
+                height: 19px;
+            }
+
+            .map-status {
+                top: 10px;
+                right: 10px;
+                min-height: 32px;
+                padding: 0 9px;
+            }
+        }
+
+        @media (max-width: 390px) {
+            body {
+                grid-template-rows: minmax(0, 1fr) min(46vh, 360px);
+            }
+
+            .route-name {
+                font-size: 11px;
+            }
+
+            .service-controls {
+                grid-template-columns: minmax(120px, .75fr) minmax(0, 1fr);
+            }
+        }
+    </style>
+</head>
+<body>
+    <aside class="sidebar">
+        <header class="masthead">
+            <div class="brand-mark" aria-hidden="true">METRO</div>
+            <div>
+                <p class="eyebrow">Madison, Wisconsin</p>
+                <h1>Transit service map</h1>
+            </div>
+        </header>
+
+        <section class="service-controls" aria-label="Service date">
+            <label class="date-label" for="service-date">Service date</label>
+            <input id="service-date" type="date" />
+            <p class="feed-period" id="feed-period">Loading feed dates…</p>
+        </section>
+
+        <div class="route-heading">
+            <h2 class="section-label">Routes</h2>
+            <div class="route-actions">
+                <button id="show-all" type="button">All</button>
+                <button id="show-none" type="button">None</button>
+            </div>
+        </div>
+        <input id="route-search" type="search" placeholder="Find a route" aria-label="Find a route" />
+        <div id="route-list" aria-label="Bus routes"></div>
+
+        <footer class="sidebar-footer">
+            Data provided under license granted by City of Madison, WI, Metro Transit.<br />
+            <a href="https://transitdata.cityofmadison.com/MetroTransitDataTermsOfUse.pdf" target="_blank" rel="noreferrer">Data terms</a>
+            &nbsp;·&nbsp; Map tiles © Esri
+        </footer>
+    </aside>
+
+    <main>
+        <div id="map" aria-label="Map of Madison Metro routes and stops"></div>
+        <div class="map-status" id="map-status" hidden>
+            <span class="status-dot" aria-hidden="true"></span>
+            <span id="status-text"></span>
+        </div>
+        <div id="load-state" role="status" aria-live="polite">Loading Madison Metro service…</div>
+    </main>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        const map = L.map("map", { preferCanvas: true }).setView([43.0731, -89.4012], 12);
+
+        L.tileLayer(
+            "https://server.arcgisonline.com/ArcGIS/rest/services/World_Street_Map/MapServer/tile/{z}/{y}/{x}",
+            {
+                maxZoom: 19,
+                attribution: "Tiles &copy; Esri &mdash; Sources: Esri, TomTom, Garmin, FAO, NOAA, USGS, OpenStreetMap contributors, and the GIS User Community"
+            }
+        ).addTo(map);
+
+        const colorForRoute = (index) => `hsl(${(index * 137.508 + 18) % 360} 70% 39%)`;
+        const escapeHtml = (value) => String(value).replace(/[&<>"']/g, (character) => ({
+            "&": "&amp;",
+            "<": "&lt;",
+            ">": "&gt;",
+            '"': "&quot;",
+            "'": "&#39;"
+        })[character]);
+
+        const formatDate = (date, timeZone) => new Intl.DateTimeFormat("en-US", {
+            weekday: "long",
+            month: "long",
+            day: "numeric",
+            year: "numeric",
+            timeZone
+        }).format(new Date(`${date}T12:00:00`));
+
+        const formatFeedDate = (date) => {
+            const isoDate = `${date.slice(0, 4)}-${date.slice(4, 6)}-${date.slice(6, 8)}`;
+            return new Intl.DateTimeFormat("en-US", { month: "short", day: "numeric", year: "numeric" })
+                .format(new Date(`${isoDate}T12:00:00`));
+        };
+
+        const formatTime = (seconds) => {
+            const hour = Math.floor(seconds / 3600);
+            const dayOffset = Math.floor(hour / 24);
+            const hourOfDay = hour % 24;
+            const minute = Math.floor((seconds % 3600) / 60);
+            const displayHour = hourOfDay % 12 || 12;
+            const period = hourOfDay < 12 ? "AM" : "PM";
+            return `${displayHour}:${String(minute).padStart(2, "0")} ${period}${dayOffset ? ` +${dayOffset}d` : ""}`;
+        };
+
+        const dateTimeInZone = (timeZone) => {
+            const parts = Object.fromEntries(new Intl.DateTimeFormat("en-US", {
+                timeZone,
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                hourCycle: "h23"
+            }).formatToParts(new Date()).map(({ type, value }) => [type, value]));
+            return {
+                date: `${parts.year}-${parts.month}-${parts.day}`,
+                seconds: Number(parts.hour) * 3600 + Number(parts.minute) * 60 + Number(parts.second)
+            };
+        };
+
+        async function loadServiceMap() {
+            const loadState = document.querySelector("#load-state");
+            try {
+                const response = await fetch("data/madison-metro.json.gz");
+                if (!response.ok) {
+                    throw new Error(`GTFS data request failed (${response.status})`);
+                }
+                if (!window.DecompressionStream) {
+                    throw new Error("This browser cannot open the compressed schedule data. Try a current version of Chrome, Edge, Firefox, or Safari.");
+                }
+                const stream = response.body.pipeThrough(new DecompressionStream("gzip"));
+                const data = await new Response(stream).json();
+                renderServiceMap(data);
+                loadState.hidden = true;
+            } catch (error) {
+                loadState.textContent = `Unable to load Metro data: ${error.message}`;
+            }
+        }
+
+        function renderServiceMap(data) {
+            const [publisher, feedStart, feedEnd, , agencyTimezone] = data.feed;
+            const routes = data.routes;
+            const routeColors = routes.map((_, index) => colorForRoute(index));
+            const enabledRoutes = new Set(routes.map((_, index) => index));
+            const routeLayers = routes.map(() => L.layerGroup().addTo(map));
+            const stopRecords = [];
+            const routeList = document.querySelector("#route-list");
+            const routeSearch = document.querySelector("#route-search");
+            const dateInput = document.querySelector("#service-date");
+            const status = document.querySelector("#map-status");
+            const statusText = document.querySelector("#status-text");
+            const stopRenderer = L.canvas({ padding: 0.5, pane: "markerPane", tolerance: 9 });
+            let selectedStop = null;
+            let activeServices = new Set();
+            let windowStartSeconds = 0;
+            let windowEndSeconds = 7200;
+
+            document.querySelector("#feed-period").textContent =
+                `Schedule data · ${formatFeedDate(feedStart)}–${formatFeedDate(feedEnd)}`;
+            dateInput.min = `${feedStart.slice(0, 4)}-${feedStart.slice(4, 6)}-${feedStart.slice(6, 8)}`;
+            dateInput.max = `${feedEnd.slice(0, 4)}-${feedEnd.slice(4, 6)}-${feedEnd.slice(6, 8)}`;
+            const { date: today } = dateTimeInZone(agencyTimezone);
+            dateInput.value = today >= dateInput.min && today <= dateInput.max ? today : dateInput.min;
+
+            for (const [routeIndex, coordinates] of data.shapes) {
+                const route = routes[routeIndex];
+                const number = route[1] || route[0];
+                const line = L.polyline(coordinates, {
+                    pane: "overlayPane",
+                    color: routeColors[routeIndex],
+                    weight: 3,
+                    opacity: 0.82,
+                    smoothFactor: 1
+                });
+                line.bindTooltip(`Route ${escapeHtml(number)} · ${escapeHtml(route[2])}`, { sticky: true });
+                routeLayers[routeIndex].addLayer(line);
+            }
+
+            const stopPopup = L.popup({ maxWidth: 420, minWidth: 280, autoPanPadding: [18, 18] });
+
+            const popupContent = (stop) => {
+                const [stopId, stopCode, stopName, , , departures] = stop;
+                const groups = new Map();
+                for (const [routeIndex, serviceIndex, seconds, headsignIndex] of departures) {
+                    if (!activeServices.has(serviceIndex)
+                        || !enabledRoutes.has(routeIndex)
+                        || seconds < windowStartSeconds
+                        || seconds >= windowEndSeconds) {
+                        continue;
+                    }
+                    const key = `${routeIndex}:${headsignIndex}`;
+                    if (!groups.has(key)) {
+                        groups.set(key, { routeIndex, headsignIndex, times: [] });
+                    }
+                    groups.get(key).times.push(seconds);
+                }
+
+                const schedule = [...groups.values()]
+                    .sort((left, right) => left.routeIndex - right.routeIndex || left.headsignIndex - right.headsignIndex)
+                    .map((group) => {
+                        const route = routes[group.routeIndex];
+                        const routeName = route[1] || route[0];
+                        const headsign = data.headsigns[group.headsignIndex];
+                        const times = group.times.map((time) =>
+                            `<span class="departure-time">${formatTime(time)}</span>`
+                        ).join("");
+                        return `<section class="time-group" style="--route-color:${routeColors[group.routeIndex]}">
+                            <div class="time-group-heading">${escapeHtml(routeName)}<span class="time-headsign">${escapeHtml(headsign)}</span></div>
+                            <div class="time-list">${times}</div>
+                        </section>`;
+                    }).join("");
+
+                const code = stopCode ? `Stop ${escapeHtml(stopCode)}` : `Stop ${escapeHtml(stopId)}`;
+                return `<article class="stop-popup">
+                    <header class="stop-popup-head">
+                        <div class="stop-popup-code">${code}</div>
+                        <h2 class="stop-popup-title">${escapeHtml(stopName)}</h2>
+                        <p class="stop-popup-date">Scheduled departures in the next 2 hours · ${formatDate(dateInput.value, agencyTimezone)}</p>
+                        <p class="stop-popup-live"><a href="https://metromap.cityofmadison.com/predictions/bystop/bustime:${encodeURIComponent(stopCode || stopId)}" target="_blank" rel="noreferrer">Open live predictions</a></p>
+                    </header>
+                    <div class="stop-schedule">${schedule || '<p class="schedule-empty">No scheduled departures for this date and route selection.</p>'}</div>
+                </article>`;
+            };
+
+            for (const stop of data.stops) {
+                const [stopId, stopCode, stopName, latitude, longitude, departures] = stop;
+                const servingRoutes = new Set(departures.map((departure) => departure[0]));
+                const marker = L.circleMarker([latitude, longitude], {
+                    renderer: stopRenderer,
+                    radius: 3.2,
+                    color: "#fffefa",
+                    weight: 1,
+                    fillColor: "#19322e",
+                    fillOpacity: 0.92,
+                    bubblingMouseEvents: false,
+                    title: `${stopName} · ${stopCode || stopId}`
+                });
+                marker.on("click", () => {
+                    selectedStop = stop;
+                    stopPopup.setLatLng(marker.getLatLng()).setContent(popupContent(stop)).openOn(map);
+                });
+                marker.addTo(map);
+                stopRecords.push({ marker, stop, servingRoutes });
+            }
+
+            const updateStatus = (visibleStopCount) => {
+                statusText.textContent = `${enabledRoutes.size} of ${routes.length} routes · ${visibleStopCount.toLocaleString()} stops in next 2h`;
+                status.hidden = false;
+            };
+
+            const updateVisibility = () => {
+                routes.forEach((_, routeIndex) => {
+                    const layer = routeLayers[routeIndex];
+                    if (enabledRoutes.has(routeIndex)) {
+                        if (!map.hasLayer(layer)) layer.addTo(map);
+                    } else if (map.hasLayer(layer)) {
+                        map.removeLayer(layer);
+                    }
+                });
+                let visibleStopCount = 0;
+                for (const { marker, stop, servingRoutes } of stopRecords) {
+                    const visible = [...servingRoutes].some((routeIndex) => enabledRoutes.has(routeIndex))
+                        && stop[5].some(([routeIndex, serviceIndex, seconds]) =>
+                            enabledRoutes.has(routeIndex)
+                            && activeServices.has(serviceIndex)
+                            && seconds >= windowStartSeconds
+                            && seconds < windowEndSeconds
+                        );
+                    if (visible) visibleStopCount += 1;
+                    if (visible && !map.hasLayer(marker)) marker.addTo(map);
+                    if (!visible && map.hasLayer(marker)) map.removeLayer(marker);
+                }
+                updateStatus(visibleStopCount);
+                if (selectedStop) {
+                    stopPopup.setContent(popupContent(selectedStop));
+                }
+            };
+
+            routes.forEach((route, routeIndex) => {
+                const [routeId, routeNumber, routeName] = route;
+                const row = document.createElement("label");
+                row.className = "route-row";
+                row.dataset.search = `${routeNumber} ${routeName} ${routeId}`.toLowerCase();
+
+                const checkbox = document.createElement("input");
+                checkbox.type = "checkbox";
+                checkbox.checked = true;
+                checkbox.setAttribute("aria-label", `Show route ${routeNumber || routeId}`);
+                checkbox.addEventListener("change", () => {
+                    if (checkbox.checked) enabledRoutes.add(routeIndex);
+                    else enabledRoutes.delete(routeIndex);
+                    updateVisibility();
+                });
+
+                const swatch = document.createElement("span");
+                swatch.className = "route-swatch";
+                swatch.style.backgroundColor = routeColors[routeIndex];
+
+                const number = document.createElement("span");
+                number.className = "route-number";
+                number.textContent = routeNumber || routeId;
+
+                const name = document.createElement("span");
+                name.className = "route-name";
+                name.textContent = routeName;
+                name.title = routeName;
+
+                row.append(checkbox, swatch, number, name);
+                routeList.append(row);
+            });
+
+            const updateScheduleDate = () => {
+                const selectedDate = dateInput.value.replaceAll("-", "");
+                const weekdayIndex = (new Date(`${dateInput.value}T12:00:00Z`).getUTCDay() + 6) % 7;
+                activeServices = new Set();
+
+                data.services.forEach(([serviceId, days, start, end], index) => {
+                    if (selectedDate >= start && selectedDate <= end && days[weekdayIndex] === "1") {
+                        activeServices.add(index);
+                    }
+                });
+
+                for (const [serviceIndex, exceptionDate, exceptionType] of data.exceptions) {
+                    if (exceptionDate !== selectedDate) continue;
+                    if (exceptionType === 1) activeServices.add(serviceIndex);
+                    else activeServices.delete(serviceIndex);
+                }
+
+                windowStartSeconds = dateTimeInZone(agencyTimezone).seconds;
+                windowEndSeconds = windowStartSeconds + 7200;
+                updateVisibility();
+                if (selectedStop) stopPopup.setContent(popupContent(selectedStop));
+            };
+
+            dateInput.addEventListener("change", updateScheduleDate);
+            updateScheduleDate();
+
+            document.querySelector("#show-all").addEventListener("click", () => {
+                enabledRoutes.clear();
+                routes.forEach((_, index) => enabledRoutes.add(index));
+                routeList.querySelectorAll("input[type=checkbox]").forEach((checkbox) => { checkbox.checked = true; });
+                updateVisibility();
+            });
+
+            document.querySelector("#show-none").addEventListener("click", () => {
+                enabledRoutes.clear();
+                routeList.querySelectorAll("input[type=checkbox]").forEach((checkbox) => { checkbox.checked = false; });
+                updateVisibility();
+            });
+
+            routeSearch.addEventListener("input", () => {
+                const query = routeSearch.value.trim().toLowerCase();
+                for (const row of routeList.children) {
+                    row.hidden = query !== "" && !row.dataset.search.includes(query);
+                }
+            });
+
+            window.setInterval(() => {
+                windowStartSeconds = dateTimeInZone(agencyTimezone).seconds;
+                windowEndSeconds = windowStartSeconds + 7200;
+                updateVisibility();
+            }, 30000);
+
+            updateVisibility();
+            document.title = `Madison Metro Service Map · ${publisher}`;
+        }
+
+        loadServiceMap();
+    </script>
+</body>
+</html>
